@@ -383,6 +383,7 @@ impl CommandDef {
         let inputmap = InputMap::new(config);
 
         let mut candidates_for_removal = vec![];
+        #[allow(unexpected_cfgs)] // <https://github.com/SSheldon/rust-objc/issues/125>
         let wezterm_perform_key_assignment_sel = sel!(weztermPerformKeyAssignment:);
 
         /// Mark menu items as candidates for removal
@@ -458,19 +459,13 @@ impl CommandDef {
                         menu.add_item(&about_item);
                         menu.add_item(&MenuItem::new_separator());
 
-                        // FIXME: when we set this as the services menu,
-                        // both Help and trying to open Services cause
-                        // the process to spin forever in some internal
-                        // menu validation phase.
-                        if false {
-                            let services_menu = Menu::new_with_title("Services");
-                            services_menu.assign_as_services_menu();
-                            let services_item = MenuItem::new_with("Services", None, "");
-                            menu.add_item(&services_item);
-                            services_item.set_sub_menu(&services_menu);
+                        let services_menu = Menu::new_with_title("Services");
+                        services_menu.assign_as_services_menu();
+                        let services_item = MenuItem::new_with("Services", None, "");
+                        menu.add_item(&services_item);
+                        services_item.set_sub_menu(&services_menu);
 
-                            menu.add_item(&MenuItem::new_separator());
-                        }
+                        menu.add_item(&MenuItem::new_separator());
                     } else if cmd.menubar[0] == "Help" {
                         menu.assign_as_help_menu();
                     }
@@ -806,6 +801,14 @@ pub fn derive_command_from_key_assignment(action: &KeyAssignment) -> Option<Comm
         InputSelector(_) => CommandDef {
             brief: "Prompt the user to choose from a list".into(),
             doc: "Activates the selector overlay and wait for input".into(),
+            keys: vec![],
+            args: &[ArgType::ActiveWindow],
+            menubar: &[],
+            icon: None,
+        },
+        Confirmation(_) => CommandDef {
+            brief: "Prompt the user for confirmation".into(),
+            doc: "Activates the confirmation overlay and wait for input".into(),
             keys: vec![],
             args: &[ArgType::ActiveWindow],
             menubar: &[],
@@ -1668,7 +1671,7 @@ pub fn derive_command_from_key_assignment(action: &KeyAssignment) -> Option<Comm
             icon: Some("md_pipe_disconnected"),
         },
         OpenUri(uri) => match uri.as_ref() {
-            "https://wezfurlong.org/wezterm/" => CommandDef {
+            "https://wezterm.org/" => CommandDef {
                 brief: "Documentation".into(),
                 doc: "Visit the wezterm documentation website".into(),
                 keys: vec![],
@@ -1676,7 +1679,7 @@ pub fn derive_command_from_key_assignment(action: &KeyAssignment) -> Option<Comm
                 menubar: &["Help"],
                 icon: Some("md_help"),
             },
-            "https://github.com/wez/wezterm/discussions/" => CommandDef {
+            "https://github.com/wezterm/wezterm/discussions/" => CommandDef {
                 brief: "Discuss on GitHub".into(),
                 doc: "Visit wezterm's GitHub discussion".into(),
                 keys: vec![],
@@ -1684,7 +1687,7 @@ pub fn derive_command_from_key_assignment(action: &KeyAssignment) -> Option<Comm
                 menubar: &["Help"],
                 icon: Some("oct_comment_discussion"),
             },
-            "https://github.com/wez/wezterm/issues/" => CommandDef {
+            "https://github.com/wezterm/wezterm/issues/" => CommandDef {
                 brief: "Search or report issue on GitHub".into(),
                 doc: "Visit wezterm's GitHub issues".into(),
                 keys: vec![],
@@ -2134,9 +2137,9 @@ fn compute_default_actions() -> Vec<KeyAssignment> {
         ShowLauncher,
         ShowTabNavigator,
         // ----------------- Help
-        OpenUri("https://wezfurlong.org/wezterm/".to_string()),
-        OpenUri("https://github.com/wez/wezterm/discussions/".to_string()),
-        OpenUri("https://github.com/wez/wezterm/issues/".to_string()),
+        OpenUri("https://wezterm.org/".to_string()),
+        OpenUri("https://github.com/wezterm/wezterm/discussions/".to_string()),
+        OpenUri("https://github.com/wezterm/wezterm/issues/".to_string()),
         ShowDebugOverlay,
         // ----------------- Misc
         OpenLinkAtMouseCursor,
