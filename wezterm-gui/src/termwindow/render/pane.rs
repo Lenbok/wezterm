@@ -424,7 +424,9 @@ impl crate::TermWindow {
                     let shape_hash = self.term_window.shape_hash_for_line(line);
                     // Never use line quad cache for lines with image cells; always re-render
                     // with current metrics so positioning stays correct after zoom/scale changes.
-                    let line_has_image = line.visible_cells().any(|c| c.attrs().has_attached_images());
+                    let line_has_image = line
+                        .visible_cells()
+                        .any(|c| c.attrs().has_attached_images());
 
                     let quad_key = LineQuadCacheKey {
                         pane_id: self.pane_id,

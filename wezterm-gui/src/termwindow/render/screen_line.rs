@@ -668,11 +668,30 @@ impl crate::TermWindow {
                 for glyph_idx in 0..info.pos.num_cells as usize {
                     for img in &images {
                         if img.z_index() >= 0 {
-                            overlay_images.push((
-                                visual_cell_idx + glyph_idx,
-                                img.clone(),
-                                item.fg_color,
-                            ));
+                            let cell_pos = visual_cell_idx + glyph_idx;
+
+                            // For placement_id images, verify the cell position is consistent
+                            // with the image's texture coordinates. This filters out images
+                            // that have shifted to wrong positions after cell operations.
+                            if img.has_placement_id() {
+                                let top_left_x: f32 = img.top_left().x.into();
+                                let bottom_right_x: f32 = img.bottom_right().x.into();
+                                let texture_delta = bottom_right_x - top_left_x;
+
+                                if texture_delta > 0.0001 {
+                                    // Estimate which column of the image this cell represents
+                                    let estimated_slice_idx =
+                                        (top_left_x / texture_delta).round() as usize;
+
+                                    // If cell_pos < estimated_slice_idx, this cell has shifted
+                                    // left from its original position. Skip rendering it.
+                                    if cell_pos < estimated_slice_idx {
+                                        continue;
+                                    }
+                                }
+                            }
+
+                            overlay_images.push((cell_pos, img.clone(), item.fg_color));
                         }
                     }
                 }
