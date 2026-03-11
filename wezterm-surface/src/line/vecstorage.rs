@@ -23,11 +23,37 @@ impl VecStorage {
     pub(crate) fn set_cell(&mut self, idx: usize, mut cell: Cell, clear_image_placement: bool) {
         #[cfg(feature = "use_image")]
         if !clear_image_placement {
-            if let Some(images) = self.cells[idx].attrs().images() {
-                for image in images {
-                    if image.has_placement_id() {
-                        cell.attrs_mut().attach_image(Box::new(image));
+            // Copy images from the old cell to the new cell.
+            // This preserves images when text is written over them (images "float over" text).
+            //
+            // However, if the NEW cell already has placement_id images attached, don't copy
+            // placement_id images from the OLD cell. This handles the case where
+            // assign_image_to_cells places a new image and we don't want to duplicate
+            // the old image onto the cell.
+            let new_cell_has_placement_id = cell
+                .attrs()
+                .images()
+                .map_or(false, |imgs| imgs.iter().any(|i| i.has_placement_id()));
+
+            if let Some(old_images) = self.cells[idx].attrs().images() {
+                for image in old_images {
+                    // Skip copying placement_id images if new cell already has them
+                    if image.has_placement_id() && new_cell_has_placement_id {
+                        continue;
                     }
+
+                    // For placement_id images, verify the image belongs at this cell position.
+                    // The texture coordinate top_left.x indicates which horizontal slice this is.
+                    // If top_left.x > 0, this is not the leftmost slice and should not be at idx=0.
+                    // This prevents the "stripe at left edge" bug from cell shift operations.
+                    if image.has_placement_id() {
+                        let top_left_x: f32 = image.top_left().x.into();
+                        if top_left_x > 0.001 && idx == 0 {
+                            continue;
+                        }
+                    }
+
+                    cell.attrs_mut().attach_image(Box::new(image));
                 }
             }
         }
