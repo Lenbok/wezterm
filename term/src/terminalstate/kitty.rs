@@ -1,6 +1,6 @@
 use crate::terminalstate::image::*;
 use crate::terminalstate::{ImageAttachParams, PlacementInfo};
-use crate::{StableRowIndex, TerminalState};
+use crate::TerminalState;
 use ::image::{
     DynamicImage, GenericImage, GenericImageView, ImageBuffer, RgbImage, Rgba, RgbaImage,
 };
@@ -289,17 +289,14 @@ impl TerminalState {
         Ok(())
     }
 
-    fn kitty_remove_placement_from_model(
-        &mut self,
-        image_id: u32,
-        placement_id: Option<u32>,
-        info: PlacementInfo,
-    ) {
+    /// Detach (image_id, placement_id) from every cell on the screen so that
+    /// ghost copies from copy-on-overwrite are cleared when a placement is
+    /// removed or replaced.
+    fn kitty_remove_placement_from_model(&mut self, image_id: u32, placement_id: Option<u32>) {
         let seqno = self.seqno;
         let screen = self.screen_mut();
-        let range =
-            screen.stable_range(&(info.first_row..info.first_row + info.rows as StableRowIndex));
-        for idx in range {
+        let rows = screen.scrollback_rows();
+        for idx in 0..rows {
             let line = screen.line_mut(idx);
             for c in line.cells_mut() {
                 c.attrs_mut()
@@ -311,9 +308,14 @@ impl TerminalState {
 
     fn kitty_remove_placement(&mut self, image_id: u32, placement_id: Option<u32>) {
         if placement_id.is_some() {
-            if let Some(info) = self.kitty_img.placements.remove(&(image_id, placement_id)) {
+            if self
+                .kitty_img
+                .placements
+                .remove(&(image_id, placement_id))
+                .is_some()
+            {
                 log::trace!("removed placement {} {:?}", image_id, placement_id);
-                self.kitty_remove_placement_from_model(image_id, placement_id, info);
+                self.kitty_remove_placement_from_model(image_id, placement_id);
             }
         } else {
             let mut to_clear = vec![];
@@ -323,8 +325,8 @@ impl TerminalState {
                 }
             }
             for p in to_clear.into_iter() {
-                if let Some(info) = self.kitty_img.placements.remove(&(image_id, p)) {
-                    self.kitty_remove_placement_from_model(image_id, p, info);
+                if self.kitty_img.placements.remove(&(image_id, p)).is_some() {
+                    self.kitty_remove_placement_from_model(image_id, p);
                 }
             }
         }
@@ -338,8 +340,8 @@ impl TerminalState {
     }
 
     pub(crate) fn kitty_remove_all_placements(&mut self, delete: bool) {
-        for ((image_id, p), info) in std::mem::take(&mut self.kitty_img.placements).into_iter() {
-            self.kitty_remove_placement_from_model(image_id, p, info);
+        for (image_id, p) in std::mem::take(&mut self.kitty_img.placements).into_keys() {
+            self.kitty_remove_placement_from_model(image_id, p);
         }
         if delete {
             self.kitty_img.id_to_data.clear();

@@ -577,16 +577,16 @@ impl Screen {
             for dest_row in phys_scroll.start..phys_scroll.start + rows_to_copy {
                 let src_row = dest_row + num_rows;
 
-                // Copy the source cells first
-                let cells = {
-                    self.lines[src_row]
-                        .cells_mut()
-                        .iter()
-                        .skip(left_and_right_margins.start)
-                        .take(left_and_right_margins.end - left_and_right_margins.start)
-                        .cloned()
-                        .collect::<Vec<_>>()
-                };
+                // Copy the source cells first, excluding placement_id images
+                // which are tied to specific screen positions and should not
+                // be duplicated during scroll operations.
+                let cells: Vec<_> = self.lines[src_row]
+                    .cells_mut()
+                    .iter()
+                    .skip(left_and_right_margins.start)
+                    .take(left_and_right_margins.end - left_and_right_margins.start)
+                    .map(|c| c.clone_without_placement_images())
+                    .collect();
 
                 // and place them into the dest
                 let dest_row = self.line_mut(dest_row);
@@ -602,7 +602,7 @@ impl Screen {
                 for (src_cell, dest_cell) in
                     cells.into_iter().zip(&mut dest_row.cells_mut()[dest_range])
                 {
-                    *dest_cell = src_cell.clone();
+                    *dest_cell = src_cell;
                 }
 
                 dest_row.fill_range(
@@ -847,16 +847,16 @@ impl Screen {
             for src_row in (phys_scroll.start..phys_scroll.start + rows_to_copy).rev() {
                 let dest_row = src_row + num_rows;
 
-                // Copy the source cells first
-                let cells = {
-                    self.lines[src_row]
-                        .cells_mut()
-                        .iter()
-                        .skip(left_and_right_margins.start)
-                        .take(left_and_right_margins.end - left_and_right_margins.start)
-                        .cloned()
-                        .collect::<Vec<_>>()
-                };
+                // Copy the source cells first, excluding placement_id images
+                // which are tied to specific screen positions and should not
+                // be duplicated during scroll operations.
+                let cells: Vec<_> = self.lines[src_row]
+                    .cells_mut()
+                    .iter()
+                    .skip(left_and_right_margins.start)
+                    .take(left_and_right_margins.end - left_and_right_margins.start)
+                    .map(|c| c.clone_without_placement_images())
+                    .collect();
 
                 // and place them into the dest
                 let dest_row = self.line_mut(dest_row);
@@ -871,7 +871,7 @@ impl Screen {
                 for (src_cell, dest_cell) in
                     cells.into_iter().zip(&mut dest_row.cells_mut()[dest_range])
                 {
-                    *dest_cell = src_cell.clone();
+                    *dest_cell = src_cell;
                 }
 
                 dest_row.fill_range(

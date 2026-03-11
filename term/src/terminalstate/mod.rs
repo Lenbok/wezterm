@@ -2157,10 +2157,54 @@ impl TerminalState {
                     let right_margin = self.left_and_right_margins.end;
                     let limit = (x + n as usize).min(right_margin);
 
+                    // Save placement_id images before the shift so we can restore them.
+                    // This prevents DeleteCharacter from destroying images that should
+                    // "float over" the terminal content (per kitty protocol).
+                    #[cfg(feature = "use_image")]
+                    let saved_images: Vec<(
+                        usize,
+                        Vec<wezterm_cell::image::ImageCell>,
+                    )> = {
+                        let screen = self.screen_mut();
+                        let line_idx = screen.phys_row(y);
+                        let line = screen.line_mut(line_idx);
+                        let mut images = Vec::new();
+                        for cell_ref in line.visible_cells() {
+                            let idx = cell_ref.cell_index();
+                            if let Some(cell_images) = cell_ref.attrs().images() {
+                                let placement_images: Vec<_> = cell_images
+                                    .into_iter()
+                                    .filter(|img| img.has_placement_id())
+                                    .collect();
+                                if !placement_images.is_empty() {
+                                    images.push((idx, placement_images));
+                                }
+                            }
+                        }
+                        images
+                    };
+
                     let blank_attr = self.pen.clone_sgr_only();
                     let screen = self.screen_mut();
                     for _ in x..limit as usize {
                         screen.erase_cell(x, y, right_margin, seqno, blank_attr.clone());
+                    }
+
+                    // Restore saved images at their original positions.
+                    #[cfg(feature = "use_image")]
+                    {
+                        let screen = self.screen_mut();
+                        let line_idx = screen.phys_row(y);
+                        let line = screen.line_mut(line_idx);
+                        for (idx, images) in saved_images {
+                            if idx < line.len() {
+                                for img in images {
+                                    line.cells_mut()[idx]
+                                        .attrs_mut()
+                                        .attach_image(Box::new(img));
+                                }
+                            }
+                        }
                     }
                 }
             }

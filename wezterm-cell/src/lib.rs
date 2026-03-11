@@ -387,6 +387,29 @@ impl CellAttributes {
         self.deallocate_fat_attributes_if_none();
     }
 
+    /// Detach all images that have a placement_id (kitty placements).
+    /// Used to prevent ghost placements when reusing cells.
+    #[cfg(feature = "use_image")]
+    pub fn detach_all_images_with_placement_id(&mut self) {
+        if let Some(fat) = self.fat.as_mut() {
+            fat.image.retain(|im| !im.has_placement_id());
+        }
+        self.deallocate_fat_attributes_if_none();
+    }
+
+    /// Clone attributes, but exclude images that have a placement_id.
+    /// Used during scroll operations to prevent copying kitty image placements
+    /// that are tied to specific screen positions.
+    #[cfg(feature = "use_image")]
+    pub fn clone_without_placement_images(&self) -> Self {
+        let mut res = self.clone();
+        if let Some(fat) = res.fat.as_mut() {
+            fat.image.retain(|im| !im.has_placement_id());
+        }
+        res.deallocate_fat_attributes_if_none();
+        res
+    }
+
     /// Add an image attachement, preserving any existing attachments.
     /// The list of images is maintained in z-index order
     pub fn attach_image(&mut self, image: Box<ImageCell>) -> &mut Self {
@@ -469,9 +492,7 @@ impl CellAttributes {
     /// Cheap check that does not allocate.
     #[cfg(feature = "use_image")]
     pub fn has_attached_images(&self) -> bool {
-        self.fat
-            .as_ref()
-            .map_or(false, |fat| !fat.image.is_empty())
+        self.fat.as_ref().map_or(false, |fat| !fat.image.is_empty())
     }
 
     #[cfg(not(feature = "use_image"))]
@@ -621,7 +642,11 @@ impl TeenyString {
             " "
         } else if s.len() == 1 {
             let b = s.as_bytes()[0];
-            if b < 0x20 || b == 0x7f { " " } else { s }
+            if b < 0x20 || b == 0x7f {
+                " "
+            } else {
+                s
+            }
         } else {
             s
         };
@@ -666,7 +691,11 @@ impl TeenyString {
 
     pub fn width(&self) -> usize {
         if Self::is_marker_bit_set(self.0) {
-            if Self::is_double_width(self.0) { 2 } else { 1 }
+            if Self::is_double_width(self.0) {
+                2
+            } else {
+                1
+            }
         } else {
             let heap = self.0 as *const u64 as *const TeenyStringHeap;
             unsafe { (*heap).width }
@@ -835,6 +864,17 @@ impl Cell {
 
     pub fn attrs_mut(&mut self) -> &mut CellAttributes {
         &mut self.attrs
+    }
+
+    /// Clone the cell, but exclude images that have a placement_id.
+    /// Used during scroll operations to prevent copying kitty image placements
+    /// that are tied to specific screen positions.
+    #[cfg(feature = "use_image")]
+    pub fn clone_without_placement_images(&self) -> Self {
+        Self {
+            text: self.text.clone(),
+            attrs: self.attrs.clone_without_placement_images(),
+        }
     }
 }
 

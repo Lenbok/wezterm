@@ -155,7 +155,6 @@ impl TerminalState {
             self.pixel_width,
             self.pixel_height
         );
-
         let mut remain_y = target_pixel_height;
         for y in 0..height_in_cells {
             let padding_bottom = cell_pixel_height.saturating_sub(remain_y) as u16;
@@ -193,6 +192,14 @@ impl TerminalState {
                     .get_cell(cursor_x + x, cursor_y)
                     .cloned()
                     .unwrap_or_else(Cell::blank);
+
+                // For kitty placements, detach any existing placement_id images from the cell
+                // to avoid accumulating ghost placements when an image is placed over itself
+                // or when text with embedded placements is redrawn.
+                if matches!(params.style, ImageAttachStyle::Kitty) {
+                    cell.attrs_mut().detach_all_images_with_placement_id();
+                }
+
                 let img = Box::new(ImageCell::with_z_index(
                     TextureCoordinate::new(xpos, ypos),
                     TextureCoordinate::new(xpos + x_delta, ypos + y_delta),
