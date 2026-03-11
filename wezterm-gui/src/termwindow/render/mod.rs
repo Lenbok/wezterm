@@ -65,6 +65,11 @@ pub struct LineQuadCacheKey {
     pub top_pixel_y: NotNan<f32>,
     pub left_pixel_x: NotNan<f32>,
     pub phys_line_idx: usize,
+    /// Stable row index so we never reuse quads from one logical line for another.
+    pub stable_row: StableRowIndex,
+    /// Cell dimensions so we never reuse quads after zoom/font scale change.
+    pub cell_width: NotNan<f32>,
+    pub cell_height: NotNan<f32>,
     pub pane_id: PaneId,
     pub pane_is_active: bool,
     /// A cursor position with the y value fixed at 0.
