@@ -3348,19 +3348,27 @@ impl TermWindow {
             None => None,
         };
 
-        let mut state = self.pane_state(pane_id);
-        if pos != state.viewport {
-            state.viewport = pos;
+        let viewport_changed = {
+            let mut state = self.pane_state(pane_id);
+            if pos != state.viewport {
+                state.viewport = pos;
 
-            // This is a bit gross.  If we add other overlays that need this information,
-            // this should get extracted out into a trait
-            if let Some(overlay) = state.overlay.as_ref() {
-                if let Some(copy) = overlay.pane.downcast_ref::<CopyOverlay>() {
-                    copy.viewport_changed(pos);
-                } else if let Some(qs) = overlay.pane.downcast_ref::<QuickSelectOverlay>() {
-                    qs.viewport_changed(pos);
+                // This is a bit gross.  If we add other overlays that need this information,
+                // this should get extracted out into a trait
+                if let Some(overlay) = state.overlay.as_ref() {
+                    if let Some(copy) = overlay.pane.downcast_ref::<CopyOverlay>() {
+                        copy.viewport_changed(pos);
+                    } else if let Some(qs) = overlay.pane.downcast_ref::<QuickSelectOverlay>() {
+                        qs.viewport_changed(pos);
+                    }
                 }
+                true
+            } else {
+                false
             }
+        };
+        if viewport_changed {
+            self.quad_generation += 1;
         }
         self.window.as_ref().unwrap().invalidate();
     }
@@ -3377,7 +3385,11 @@ impl TermWindow {
     }
 
     fn scroll_to_bottom(&mut self, pane: &Arc<dyn Pane>) {
+        let was_scrolled = self.pane_state(pane.pane_id()).viewport.is_some();
         self.pane_state(pane.pane_id()).viewport = None;
+        if was_scrolled {
+            self.quad_generation += 1;
+        }
     }
 
     fn get_active_pane_no_overlay(&self) -> Option<Arc<dyn Pane>> {

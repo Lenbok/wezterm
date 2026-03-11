@@ -465,6 +465,20 @@ impl CellAttributes {
         self.fat.as_ref().and_then(|fat| fat.hyperlink.as_ref())
     }
 
+    /// Returns true if this cell has any attached images (e.g. kitty graphics).
+    /// Cheap check that does not allocate.
+    #[cfg(feature = "use_image")]
+    pub fn has_attached_images(&self) -> bool {
+        self.fat
+            .as_ref()
+            .map_or(false, |fat| !fat.image.is_empty())
+    }
+
+    #[cfg(not(feature = "use_image"))]
+    pub fn has_attached_images(&self) -> bool {
+        false
+    }
+
     /// Returns the list of attached images in z-index order.
     /// Returns None if there are no attached images; will
     /// never return Some(vec![]).

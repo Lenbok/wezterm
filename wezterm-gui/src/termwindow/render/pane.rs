@@ -422,6 +422,9 @@ impl crate::TermWindow {
                     };
 
                     let shape_hash = self.term_window.shape_hash_for_line(line);
+                    // Never use line quad cache for lines with image cells; always re-render
+                    // with current metrics so positioning stays correct after zoom/scale changes.
+                    let line_has_image = line.visible_cells().any(|c| c.attrs().has_attached_images());
 
                     let quad_key = LineQuadCacheKey {
                         pane_id: self.pane_id,
@@ -439,31 +442,42 @@ impl crate::TermWindow {
                                 * self.term_window.render_metrics.cell_size.height as f32,
                         left_pixel_x: NotNan::new(self.left_pixel_x).unwrap(),
                         phys_line_idx: line_idx,
+                        stable_row,
+                        cell_width: NotNan::new(
+                            self.term_window.render_metrics.cell_size.width as f32,
+                        )
+                        .unwrap(),
+                        cell_height: NotNan::new(
+                            self.term_window.render_metrics.cell_size.height as f32,
+                        )
+                        .unwrap(),
                         reverse_video: self.dims.reverse_video,
                     };
 
-                    if let Some(cached_quad) =
-                        self.term_window.line_quad_cache.borrow_mut().get(&quad_key)
-                    {
-                        let expired = cached_quad
-                            .expires
-                            .map(|i| Instant::now() >= i)
-                            .unwrap_or(false);
-                        let hover_changed = if cached_quad.invalidate_on_hover_change {
-                            !same_hyperlink(
-                                cached_quad.current_highlight.as_ref(),
-                                self.term_window.current_highlight.as_ref(),
-                            )
-                        } else {
-                            false
-                        };
-                        if !expired && !hover_changed {
-                            cached_quad
-                                .layers
-                                .apply_to(self.layers)
-                                .context("cached_quad.layers.apply_to")?;
-                            self.term_window.update_next_frame_time(cached_quad.expires);
-                            return Ok(());
+                    if !line_has_image {
+                        if let Some(cached_quad) =
+                            self.term_window.line_quad_cache.borrow_mut().get(&quad_key)
+                        {
+                            let expired = cached_quad
+                                .expires
+                                .map(|i| Instant::now() >= i)
+                                .unwrap_or(false);
+                            let hover_changed = if cached_quad.invalidate_on_hover_change {
+                                !same_hyperlink(
+                                    cached_quad.current_highlight.as_ref(),
+                                    self.term_window.current_highlight.as_ref(),
+                                )
+                            } else {
+                                false
+                            };
+                            if !expired && !hover_changed {
+                                cached_quad
+                                    .layers
+                                    .apply_to(self.layers)
+                                    .context("cached_quad.layers.apply_to")?;
+                                self.term_window.update_next_frame_time(cached_quad.expires);
+                                return Ok(());
+                            }
                         }
                     }
 
@@ -534,21 +548,22 @@ impl crate::TermWindow {
                     buf.apply_to(self.layers)
                         .context("HeapQuadAllocator::apply_to")?;
 
-                    let quad_value = LineQuadCacheValue {
-                        layers: buf,
-                        expires,
-                        invalidate_on_hover_change: render_result.invalidate_on_hover_change,
-                        current_highlight: if render_result.invalidate_on_hover_change {
-                            self.term_window.current_highlight.clone()
-                        } else {
-                            None
-                        },
-                    };
-
-                    self.term_window
-                        .line_quad_cache
-                        .borrow_mut()
-                        .put(quad_key, quad_value);
+                    if !line_has_image {
+                        let quad_value = LineQuadCacheValue {
+                            layers: buf,
+                            expires,
+                            invalidate_on_hover_change: render_result.invalidate_on_hover_change,
+                            current_highlight: if render_result.invalidate_on_hover_change {
+                                self.term_window.current_highlight.clone()
+                            } else {
+                                None
+                            },
+                        };
+                        self.term_window
+                            .line_quad_cache
+                            .borrow_mut()
+                            .put(quad_key, quad_value);
+                    }
 
                     Ok(())
                 }

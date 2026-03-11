@@ -471,12 +471,14 @@ impl crate::TermWindow {
                 for glyph_idx in 0..info.pos.num_cells as usize {
                     for img in &images {
                         if img.z_index() < 0 {
+                            let cell_idx = visual_cell_idx + glyph_idx;
+                            let phys_idx = phys(cell_idx, num_cols, direction);
                             self.populate_image_quad(
                                 &img,
                                 gl_state,
                                 layers,
                                 0,
-                                visual_cell_idx + glyph_idx,
+                                phys_idx,
                                 &params,
                                 hsv,
                                 item.fg_color,
@@ -697,12 +699,13 @@ impl crate::TermWindow {
         }
 
         for (cell_idx, img, glyph_color) in overlay_images {
+            let phys_idx = phys(cell_idx, num_cols, direction);
             self.populate_image_quad(
                 &img,
                 gl_state,
                 layers,
                 2,
-                phys(cell_idx, num_cols, direction),
+                phys_idx,
                 &params,
                 hsv,
                 glyph_color,

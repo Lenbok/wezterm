@@ -108,6 +108,8 @@ impl super::TermWindow {
         match RenderMetrics::new(&self.fonts) {
             Ok(metrics) => {
                 self.render_metrics = metrics;
+                // Invalidate line quad cache so we never reuse quads built with the old cell size.
+                self.quad_generation += 1;
             }
             Err(err) => {
                 log::error!(
